@@ -15,11 +15,12 @@
 
 ***************************************************************************/                                                
 
-//#ifndef USE_AMD_HSA
-#define USE_AMD_HSA 0
+//#ifndef USE_SCAN_20
+#define USE_SCAN_20 1
+#define SCAN_BURST_SIZE 4
 //#endif
 
-#if USE_AMD_HSA
+#if USE_SCAN_20
 #define HSA_STAT_INIT 0 // device hasn't done pre-scan
 #define HSA_STAT_DEVP1COMPLETE 1 // device has done pre-scan
 #define HSA_STAT_CPUP2COMPLETE 2 // cpu has done intermediate scan
@@ -78,7 +79,7 @@ OutputIterator inclusive_scan(
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
     iType init; memset(&init, 0, sizeof(iType) );
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         control::getDefault( ), first, last, result, init, true, plus< iType >( ),
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -98,7 +99,7 @@ OutputIterator inclusive_scan(
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
     iType init; memset(&init, 0, sizeof(iType) );
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         control::getDefault( ), first, last, result, init, true, binary_op,
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -116,7 +117,7 @@ OutputIterator inclusive_scan(
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
     iType init; memset(&init, 0, sizeof(iType) );
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         ctrl, first, last, result, init, true, plus< iType >( ),
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -135,7 +136,7 @@ OutputIterator inclusive_scan(
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
     iType init; memset(&init, 0, sizeof(iType) );
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         ctrl, first, last, result, init, true, binary_op,
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -155,7 +156,7 @@ OutputIterator exclusive_scan(
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
     iType init; memset(&init, 0, sizeof(iType) );
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         control::getDefault( ), first, last, result, init, false, plus< iType >( ),
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -172,7 +173,7 @@ OutputIterator exclusive_scan(
 {
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         control::getDefault( ), first, last, result, init, false, plus< iType >( ),
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -189,7 +190,7 @@ OutputIterator exclusive_scan(
     const std::string& user_code )
 {
     BOLT_PROFILER_START_TRIAL
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         control::getDefault( ), first, last, result, init, false, binary_op,
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -207,7 +208,7 @@ OutputIterator exclusive_scan(
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
     iType init = static_cast< iType >( 0 );
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         ctrl, first, last, result, init, false, plus< iType >( ),
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -225,7 +226,7 @@ OutputIterator exclusive_scan(
 {
     BOLT_PROFILER_START_TRIAL
     typedef std::iterator_traits<InputIterator>::value_type iType;
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         ctrl, first, last, result, init, false, plus< iType >( ),
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -243,7 +244,7 @@ OutputIterator exclusive_scan(
     const std::string& user_code )
 {
     BOLT_PROFILER_START_TRIAL
-    OutputIterator& rtrn = detail::scan_detect_random_access(
+    OutputIterator rtrn = detail::scan_detect_random_access(
         ctrl, first, last, result, init, false, binary_op,
         std::iterator_traits< InputIterator >::iterator_category( ) );
     BOLT_PROFILER_STOP_TRIAL
@@ -262,8 +263,8 @@ class Scan_KernelTemplateSpecializer : public KernelTemplateSpecializer
 public:
     Scan_KernelTemplateSpecializer() : KernelTemplateSpecializer()
     {
-#if USE_AMD_HSA
-        addKernelName("HSA_Scan");
+#if USE_SCAN_20
+        addKernelName("scan_I_A");
 #else
         addKernelName("perBlockInclusiveScan");
         addKernelName("intraBlockInclusiveScan");
@@ -273,23 +274,18 @@ public:
     
     const ::std::string operator() ( const ::std::vector<::std::string>& typeNames ) const
     {
-#if USE_AMD_HSA
+#if USE_SCAN_20
         const std::string templateSpecializationString = 
             "// Dynamic specialization of generic template definition, using user supplied types\n"
             "template __attribute__((mangled_name(" + name(0) + "Instantiated)))\n"
-            "__attribute__((reqd_work_group_size(KERNEL0WORKGROUPSIZE,1,1)))\n"
+            "__attribute__((reqd_work_group_size(256,1,1)))\n"
             "kernel void " + name(0) + "(\n"
-            "global " + typeNames[scan_oType] + " *output,\n"
-            "global " + typeNames[scan_iType] + " *input,\n"
-            ""        + typeNames[scan_initType] + " init,\n"
-            "const uint numElements,\n"
-            "const uint numIterations,\n"
-            "local "  + typeNames[scan_oType] + " *lds,\n"
-            "global " + typeNames[scan_BinaryFunction] + " *binaryOp,\n"
-            "global " + typeNames[scan_oType] + " *intermediateScanArray,\n"
-            "global int *status1,\n"
-            "global int *status2,\n"
-            "int exclusive\n"
+            "global " + typeNames[scan_oType]           + " *output,\n"
+            "global " + typeNames[scan_iType]           + " *input,\n"
+            ""        + typeNames[scan_initType]        + " init,\n"
+            "local "  + typeNames[scan_oType]           + " *lds,\n"
+            "global " + typeNames[scan_BinaryFunction]  + " *binaryOp,\n"
+            "global " + typeNames[scan_oType]           + " *intermediateScanArray\n"
             ");\n\n";
 #else
         const std::string templateSpecializationString = 
@@ -490,7 +486,6 @@ scan_pick_iterator(
     return result + numElements;
 }
 
-static int tmp = 0;
 
 //  All calls to inclusive_scan end up here, unless an exception was thrown
 //  This is the function that sets up the kernels to compile (once only) and execute
@@ -510,10 +505,38 @@ aProfiler.setStepName("Acquire Kernel");
 aProfiler.set(AsyncProfiler::device, control::SerialCpu);
 #endif
     cl_int l_Error = CL_SUCCESS;
-    cl_uint doExclusiveScan = inclusive ? 0 : 1; 
+    cl_uint doExclusiveScan = inclusive ? 0 : 1;
+    /**********************************************************************************
+     * Round Up Number of Elements
+     *********************************************************************************/
     const size_t numComputeUnits = ctrl.device( ).getInfo< CL_DEVICE_MAX_COMPUTE_UNITS >( );
     const size_t numWorkGroupsPerComputeUnit = ctrl.wgPerComputeUnit( );
-    const size_t workGroupSize = HSAWAVES*WAVESIZE;
+    const size_t workGroupSize = 256;
+    cl_uint numElements = static_cast< cl_uint >( std::distance( first, last ) );
+    size_t numElementsRUP = numElements;
+    size_t modWgSize = (numElementsRUP & (workGroupSize-1));
+    if( modWgSize )
+    {
+        numElementsRUP &= ~modWgSize;
+        numElementsRUP += workGroupSize;
+    }
+    size_t numWorkGroupsIdeal = 256; //numComputeUnits * numWorkGroupsPerComputeUnit;
+    cl_uint numWorkGroupsK0 = static_cast<cl_uint>(numElementsRUP / workGroupSize);
+    
+    unsigned int numElementsPerIter = workGroupSize*SCAN_BURST_SIZE;
+    unsigned int numIterations = 0;
+    while ( numIterations * numElementsPerIter * numWorkGroupsIdeal < numElements )
+    {
+        numIterations++;
+    }
+    // log2(wgSize)
+    size_t tmp = workGroupSize;
+    unsigned int workGroupSizeLog2 = -1;
+    while ( tmp != 0)
+    {
+        tmp >>= 1;
+        workGroupSizeLog2++;
+    }
 
     /**********************************************************************************
      * Type Names - used in KernelTemplateSpecializer
@@ -546,11 +569,19 @@ aProfiler.set(AsyncProfiler::device, control::SerialCpu);
     const size_t kernel2_WgSize = (cpuDevice) ? 1 : WAVESIZE*KERNEL02WAVES;
     std::string compileOptions;
     std::ostringstream oss;
-    oss << " -DKERNEL0WORKGROUPSIZE=" << kernel0_WgSize;
-    oss << " -DKERNEL1WORKGROUPSIZE=" << kernel1_WgSize;
-    oss << " -DKERNEL2WORKGROUPSIZE=" << kernel2_WgSize;
-
-    oss << " -DUSE_AMD_HSA=" << USE_AMD_HSA;
+    oss << " -DKERNEL0WORKGROUPSIZE="   << kernel0_WgSize;
+    oss << " -DKERNEL1WORKGROUPSIZE="   << kernel1_WgSize;
+    oss << " -DKERNEL2WORKGROUPSIZE="   << kernel2_WgSize;
+    oss << " -DUSE_SCAN_20="            << USE_SCAN_20;
+    oss << " -DBURST_SIZE="             << SCAN_BURST_SIZE;
+    oss << " -DEXCLUSIVE="              << doExclusiveScan;
+    oss << " -DNUM_ELEMENTS="           << numElements;
+    oss << " -DWG_SIZE="                << workGroupSize;
+    oss << " -DLOG2_WG_SIZE="           << workGroupSizeLog2;
+    oss << " -DNUM_WG="                 << numWorkGroupsIdeal;
+    oss << " -DNUM_ELEMENTS_PER_ITER="  << numElementsPerIter;
+    oss << " -DNUM_BLOCK_ITER="         << numIterations;
+    oss << " -DNUM_ELEMENTS_PER_WG="    << numIterations*numElementsPerIter;
     compileOptions = oss.str();
 
     /**********************************************************************************
@@ -572,23 +603,6 @@ aProfiler.setStepName("Acquire Intermediate Buffers");
 aProfiler.set(AsyncProfiler::device, control::SerialCpu);
 #endif
 
-    /**********************************************************************************
-     * Round Up Number of Elements
-     *********************************************************************************/
-    //  Ceiling function to bump the size of input to the next whole wavefront size
-    cl_uint numElements = static_cast< cl_uint >( std::distance( first, last ) );
-
-    size_t numElementsRUP = numElements;
-    size_t modWgSize = (numElementsRUP & (kernel0_WgSize-1));
-    if( modWgSize )
-    {
-        numElementsRUP &= ~modWgSize;
-        numElementsRUP += kernel0_WgSize;
-    }
-
-    cl_uint numWorkGroupsK0 = static_cast< cl_uint >( numElementsRUP / kernel0_WgSize );
-
-
     // Create buffer wrappers so we can access the host functors, for read or writing in the kernel
     ALIGNED( 256 ) BinaryFunction aligned_binary( binary_op );
     control::buffPointer userFunctor = ctrl.acquireBuffer( sizeof( aligned_binary ),
@@ -597,60 +611,25 @@ aProfiler.set(AsyncProfiler::device, control::SerialCpu);
 
 
     
-#if USE_AMD_HSA
+#if USE_SCAN_20
     /**********************************************************************************
      *
-     *  HSA Implementation
+     *  Fast Scan
      *
      *********************************************************************************/
 #ifdef BOLT_PROFILER_ENABLED
 aProfiler.nextStep();
-aProfiler.setStepName("Setup HSA Kernel");
+aProfiler.setStepName("Setup Kernel");
 aProfiler.set(AsyncProfiler::device, control::SerialCpu);
 #endif
 
     ::cl::Event kernel0Event;
-    size_t numWorkGroups = numComputeUnits * numWorkGroupsPerComputeUnit;
-    if (numWorkGroupsK0 < numWorkGroups)
-        numWorkGroups = numWorkGroupsK0; // nWG is lesser of elements vs compute units
-    ldsSize = static_cast< cl_uint >( ( kernel0_WgSize ) * sizeof( oType ) );
-    
-    // allocate and initialize gpu -> cpu array
-    control::buffPointer dev2hostD = ctrl.acquireBuffer( numWorkGroups*sizeof( int ),
-        CL_MEM_ALLOC_HOST_PTR /*| CL_MEM_READ_WRITE*/ );
-    ctrl.commandQueue().enqueueFillBuffer( *dev2hostD, HSA_STAT_INIT, 0, numWorkGroups*sizeof( int ) );
-    int *dev2hostH = (int *) ctrl.commandQueue().enqueueMapBuffer( *dev2hostD, CL_TRUE, CL_MAP_READ, 0,
-        numWorkGroups*sizeof( int ), NULL, NULL, &l_Error);
-    V_OPENCL( l_Error, "Error: Mapping Device->Host Buffer." );
-
-    // allocate and initialize cpu -> gpu array
-    control::buffPointer host2devD = ctrl.acquireBuffer( numWorkGroups*sizeof( int ),
-        CL_MEM_USE_PERSISTENT_MEM_AMD | CL_MEM_READ_ONLY /*CL_MEM_ALLOC_HOST_PTR | CL_MEM_READ_ONLY*/ );
-    ctrl.commandQueue().enqueueFillBuffer( *host2devD, HSA_STAT_INIT, 0, numWorkGroups*sizeof( int ) );
-    int *host2devH = (int *) ctrl.commandQueue().enqueueMapBuffer( *host2devD, CL_TRUE, CL_MAP_WRITE, 0,
-        numWorkGroups*sizeof( int ), NULL, NULL, &l_Error);
-    V_OPENCL( l_Error, "Error: Mapping Host->Device Buffer." );
-
-    
-
-    int *intermediateScanStatusHost = new int[ numWorkGroups ];
-    memset( intermediateScanStatusHost, HSA_STAT_INIT, numWorkGroups*sizeof( int ) );
-    oType *intermediateScanArrayHost = new oType[ numWorkGroups ];
-    memset( intermediateScanArrayHost, init_T, numWorkGroups*sizeof( oType ) ); // TODO remove me b/c wrong and superfluous
-    control::buffPointer intermediateScanArray  = ctrl.acquireBuffer( numWorkGroups*sizeof( oType ),
-        CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, intermediateScanArrayHost );
-    control::buffPointer intermediateScanStatus = ctrl.acquireBuffer( numWorkGroups*sizeof( int ),
-        CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, intermediateScanStatusHost );
-    // how many iterations
-    cl_uint numIterations = static_cast< cl_uint >( numElementsRUP / (numWorkGroups*workGroupSize) );
-    if (numWorkGroups*workGroupSize*numIterations < numElementsRUP) numIterations++;
-
-    for (size_t i = 0; i < numWorkGroups; i++ )
-    {
-        std::cout << "preScanStat[" << i << "]="
-            << intermediateScanArrayHost[i]
-        << " ( " << dev2hostH[i] << ", " << host2devH[i] << " )"<< std::endl;
-    }
+    ldsSize = static_cast< cl_uint >( ( workGroupSize ) * sizeof( oType ) );
+    size_t numBufferElements =
+        //numWorkGroupsIdeal
+        numElements
+        ;
+    control::buffPointer intermediateScanArray = ctrl.acquireBuffer( numBufferElements *sizeof( oType ) );
 
     /**********************************************************************************
      * Set Kernel Arguments
@@ -658,26 +637,19 @@ aProfiler.set(AsyncProfiler::device, control::SerialCpu);
     V_OPENCL( kernels[ 0 ].setArg( 0, result->getBuffer( ) ),   "Error: Output Buffer" );
     V_OPENCL( kernels[ 0 ].setArg( 1, first->getBuffer( ) ),    "Error: Input Buffer" );
     V_OPENCL( kernels[ 0 ].setArg( 2, init_T ),                 "Error: Initial Value" );
-    V_OPENCL( kernels[ 0 ].setArg( 3, numElements ),            "Error: Number of Elements" );
-    V_OPENCL( kernels[ 0 ].setArg( 4, numIterations ),          "Error: Number of Iterations" );
-    V_OPENCL( kernels[ 0 ].setArg( 5, ldsSize, NULL ),          "Error: Local Memory" );
-    V_OPENCL( kernels[ 0 ].setArg( 6, *userFunctor ),           "Error: Binary Function" );
-    V_OPENCL( kernels[ 0 ].setArg( 7, *intermediateScanArray ), "Error: Intermediate Scan Array" );
-    V_OPENCL( kernels[ 0 ].setArg( 8, *dev2hostD ),             "Error: Intermediate Scan Status" );
-    V_OPENCL( kernels[ 0 ].setArg( 9, *host2devD ),             "Error: Intermediate Scan Status" );
-    V_OPENCL( kernels[ 0 ].setArg( 10, doExclusiveScan ),       "Error: Do Exclusive Scan" );
+    V_OPENCL( kernels[ 0 ].setArg( 3, ldsSize, NULL ),          "Error: Local Memory" );
+    V_OPENCL( kernels[ 0 ].setArg( 4, *userFunctor ),           "Error: Binary Function" );
+    V_OPENCL( kernels[ 0 ].setArg( 5, *intermediateScanArray ), "Error: Intermediate Scan Array" );
 
 #ifdef BOLT_PROFILER_ENABLED
 aProfiler.nextStep();
-aProfiler.setStepName("HSA Kernel");
+aProfiler.setStepName("Fast Kernel");
 aProfiler.set(AsyncProfiler::device, ctrl.forceRunMode());
 aProfiler.set(AsyncProfiler::flops, 2*numElements);
 aProfiler.set(AsyncProfiler::memory,
     1*numElements*sizeof(iType) + // read input
-    3*numElements*sizeof(oType) + // write,read,write output
-    1*numWorkGroups*sizeof(binary_op) + // in case the functor has state
-    2*numWorkGroups*sizeof(oType)+ // write,read intermediate array
-    2*numWorkGroups*sizeof(int)); // write,read intermediate array status (perhaps multiple times)
+    1*numWorkGroupsIdeal*sizeof(oType) + // write,read,write output
+    1*numWorkGroupsIdeal*sizeof(binary_op)); // write,read intermediate array status (perhaps multiple times)
 std::string strDeviceName = ctrl.device().getInfo< CL_DEVICE_NAME >( &l_Error );
 bolt::cl::V_OPENCL( l_Error, "Device::getInfo< CL_DEVICE_NAME > failed" );
 aProfiler.setArchitecture(strDeviceName);
@@ -688,81 +660,23 @@ aProfiler.setArchitecture(strDeviceName);
     l_Error = ctrl.commandQueue( ).enqueueNDRangeKernel(
         kernels[ 0 ],
         ::cl::NullRange,
-        ::cl::NDRange( numElementsRUP ),
+        ::cl::NDRange( workGroupSize*numWorkGroupsIdeal ),
         ::cl::NDRange( workGroupSize ),
         NULL,
         &kernel0Event);
     ctrl.commandQueue().flush(); // needed
     
-    bool printAgain = true;
-    while (printAgain)
-    {
-        printAgain = false;
-        bool writtenToDevice = false;
-        for (size_t i = 0; i < numWorkGroups; i++ )
-        {
-            int stat = dev2hostH[i];
-            std::cout << "interScan[" << i << "]="
-                << intermediateScanArrayHost[i]
-                << " ( " << stat << ", " << host2devH[i] << " )" << std::endl;
-            switch( stat )
-            {
-            case HSA_STAT_INIT: // device hasn't reported P1 completion
-                printAgain = true;
-                break;
-            case HSA_STAT_DEVP1COMPLETE: // device has reported P1 completion
-                // pretend to do P2 here
-                std::cout << "P1[ " << i << " ] completed" << std::endl;
-                host2devH[i] = HSA_STAT_CPUP2COMPLETE; // report P2 completion to device
-                printAgain = true;
-                writtenToDevice = true;
-                break;
-            case HSA_STAT_CPUP2COMPLETE: // n/a
-                // device shouldn't be reporting that host is reporting P2 completion
-                std::cout << "ERROR: dev2host[" << i << "] reporting P2 completion" << std::endl;
-                printAgain = true;
-                break;
-            case HSA_STAT_DEVP3COMPLETE: // device has reported p3 (full) completion
-                // done, don't print Again
-                break;
-            default:
-                std::cout << "ERROR: dev2host[" << i << "] reporting unrecognized" << dev2hostH[i] << std::endl;
-                printAgain = true;
-                break;
-            } // switch
-        } // for workGroups
-        if (writtenToDevice)
-        {
-            std::cout << "\ttmp readback" << std::endl;
-            
-            for (size_t i = 0; i < numWorkGroups; i++)
-            {
-                tmp += host2devH[i];
-            }
-        }
-        std::cout << std::endl;
-    } // while printAgain
 
     V_OPENCL( l_Error, "enqueueNDRangeKernel() failed for HSA Kernel." );
     l_Error = kernel0Event.wait( );
     V_OPENCL( l_Error, "HSA Kernel failed to wait" );
 
 
-    for (size_t i = 0; i < numWorkGroups; i++ )
-    {
-        std::cout << "inter2can[" << i << "]=" << intermediateScanArrayHost[i] << " ( " << dev2hostH[i] << " )"<< std::endl;
-    }
+    // second kernel
 
 
 
 
-
-
-
-
-#ifdef BOLT_PROFILER_ENABLED
-aProfiler.stopTrial();
-#endif
 
 
 

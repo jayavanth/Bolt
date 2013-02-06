@@ -102,8 +102,8 @@ int _tmain( int argc, _TCHAR* argv[] )
             ( "platform,p",     po::value< cl_uint >( &userPlatform )->default_value( 0 ), "Specify the platform under test using the index reported by -q flag" )
             ( "device,d",       po::value< cl_uint >( &userDevice )->default_value( 0 ), "Specify the device under test using the index reported by the -q flag.  "
                     "Index is relative with respect to -g, -c or -a flags" )
-            ( "length,l",       po::value< size_t >( &length )->default_value( 1<<25 ), "Specify the length of Copy array" )
-            ( "iterations,i",   po::value< size_t >( &iterations )->default_value( 128 ), "Number of samples in timing loop" )
+            ( "length,l",       po::value< size_t >( &length )->default_value( 1<<20 ), "Specify the length of Copy array" )
+            ( "iterations,i",   po::value< size_t >( &iterations )->default_value( 4 ), "Number of samples in timing loop" )
 			//( "algo,a",		    po::value< size_t >( &algo )->default_value( 1 ), "Algorithm used [1,2]  1:SCAN_BOLT, 2:XYZ" )//Not used in this file
             ;
 
@@ -234,13 +234,27 @@ int _tmain( int argc, _TCHAR* argv[] )
 			      bolt::cl::copy( source.begin(), source.end(), destination.begin());
             myTimer.Stop( CopyId );
         }
+#if 0
+        //float *Ptr = source.begin();
+        for (size_t i = 0; i < length; i++)
+        {
+            float fSrc = (float) source[i];
+            float fDst = (float) destination[i];
+            bool equal = fSrc == fDst;
+            if ( !equal )
+            {
+                std::cout << i << ": " << fSrc << " != " << fDst << std::endl;
+            }
+            if (i%1000 == 0) std::cout << i << std::endl;
+        }
+#endif
     }
 
     //	Remove all timings that are outside of 2 stddev (keep 65% of samples); we ignore outliers to get a more consistent result
     size_t pruned = myTimer.pruneOutliers( 1.0 );
     double testTime = myTimer.getAverageTime( CopyId );
     double testMB = ( length * sizeof( float ) ) / ( 1024.0 * 1024.0);
-	  double testGB = testMB/ 1024.0;
+	double testGB = testMB/ 1024.0;
 
     bolt::tout << std::left;
     bolt::tout << std::setw( colWidth ) << _T( "Copy profile: " ) << _T( "[" ) << iterations-pruned << _T( "] samples" ) << std::endl;

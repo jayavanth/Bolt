@@ -604,9 +604,9 @@ int _tmain( int argc, _TCHAR* argv[] )
     cl_int err = CL_SUCCESS;
     cl_uint userPlatform    = 0;
     cl_uint userDevice      = 0;
-    size_t iterations       = 10;
+    size_t iterations       = 100;
     size_t length           = 1<<26;
-    size_t vecType          = 1;
+    size_t vecType          = 0;
     size_t runMode          = 0;
     size_t routine          = f_scan;
     size_t numThrowAway     = 10;
@@ -614,7 +614,7 @@ int _tmain( int argc, _TCHAR* argv[] )
     cl_device_type deviceType = CL_DEVICE_TYPE_DEFAULT;
     bool defaultDevice      = true;
     bool print_clInfo       = false;
-    bool hostMemory         = true;
+    bool hostMemory         = false;
 
     /******************************************************************************
      * Parse Command-line Parameters
@@ -641,11 +641,19 @@ int _tmain( int argc, _TCHAR* argv[] )
             ( "iterations,i",   po::value< size_t >( &iterations )->default_value( iterations ),
                 "Number of samples in timing loop" )
             ( "vecType,t",      po::value< size_t >( &vecType )->default_value( vecType ),
-                "Data Type to use: 1-int, 2-int2, 4-int4, 8-int8" )
+                "Data Type to use: 0-int, 1-int2, 2-int4, 3-int8" )
             ( "runMode,m",      po::value< size_t >( &runMode )->default_value( runMode ),
                 "Run Mode: 0-Auto, 1-SerialCPU, 2-MultiCoreCPU, 3-GPU" )
             ( "function",      po::value< size_t >( &routine )->default_value( routine ),
-                "Number of samples in timing loop" )
+                "0:Generate "
+                "1:Copy "
+                "2:UnaryTransform "
+                "3:BinaryTransform "
+                "4:Scan "
+                "5:TransformScan "
+                "6:ScanByKey"
+                )
+
             ( "filename",     po::value< std::string >( &filename )->default_value( filename ),
                 "Name of output file" )
             ( "throw-away",   po::value< size_t >( &numThrowAway )->default_value( numThrowAway ),
@@ -738,6 +746,7 @@ int _tmain( int argc, _TCHAR* argv[] )
         //  Now that the device we want is selected and we have created our own cl::CommandQueue, set it as the
         //  default cl::CommandQueue for the Bolt API
         ctrl.commandQueue( myQueue );
+        ctrl.debug(bolt::cl::control::debug::SaveCompilerTemps);
 
         strDeviceName = ctrl.device( ).getInfo< CL_DEVICE_NAME >( &err );
         bolt::cl::V_OPENCL( err, "Device::getInfo< CL_DEVICE_NAME > failed" );

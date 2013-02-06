@@ -20,7 +20,7 @@
 #pragma once
 
 #ifndef BURST_SIZE
-#define BURST_SIZE 4
+#define BURST_SIZE 1
 #endif
 
 #include <boost/thread/once.hpp>
@@ -28,6 +28,19 @@
 #include <type_traits>
 
 #include "bolt/cl/bolt.h"
+
+#ifdef BOLT_PROFILER_ENABLED
+#define BOLT_PROFILER_START_COPY_TRIAL \
+    aProfiler.setName("Copy"); \
+    aProfiler.startTrial(); \
+    aProfiler.setStepName("Origin"); \
+    aProfiler.set(AsyncProfiler::device, control::SerialCpu);
+#define BOLT_PROFILER_STOP_COPY_TRIAL \
+    aProfiler.stopTrial();
+#else
+#define BOLT_PROFILER_START_COPY_TRIAL
+#define BOLT_PROFILER_STOP_COPY_TRIAL
+#endif
 
 // bumps dividend up (if needed) to be evenly divisible by divisor
 // returns whether dividend changed
@@ -80,7 +93,10 @@ OutputIterator copy(const bolt::cl::control &ctrl,  InputIterator first, InputIt
     const std::string& user_code)
 {
     int n = static_cast<int>( std::distance( first, last ) );
-    return detail::copy_detect_random_access( ctrl, first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_START_COPY_TRIAL
+    OutputIterator rtrn = detail::copy_detect_random_access( ctrl, first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_STOP_COPY_TRIAL
+    return rtrn;
 }
 
 // default control
@@ -89,7 +105,10 @@ OutputIterator copy( InputIterator first, InputIterator last, OutputIterator res
     const std::string& user_code)
 {
     int n = static_cast<int>( std::distance( first, last ) );
-    return detail::copy_detect_random_access( control::getDefault(), first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_START_COPY_TRIAL
+    OutputIterator rtrn = detail::copy_detect_random_access( control::getDefault(), first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_STOP_COPY_TRIAL
+    return rtrn;
 }
 
 // default control
@@ -97,7 +116,10 @@ template<typename InputIterator, typename Size, typename OutputIterator>
 OutputIterator copy_n(InputIterator first, Size n, OutputIterator result, 
     const std::string& user_code)
 {
-    return detail::copy_detect_random_access( control::getDefault(), first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_START_COPY_TRIAL
+    OutputIterator rtrn = detail::copy_detect_random_access( control::getDefault(), first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_STOP_COPY_TRIAL
+    return rtrn;
 }
 
 // user control
@@ -105,7 +127,10 @@ template<typename InputIterator, typename Size, typename OutputIterator>
 OutputIterator copy_n(const bolt::cl::control &ctrl, InputIterator first, Size n, OutputIterator result, 
     const std::string& user_code)
 {
-    return detail::copy_detect_random_access( ctrl, first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_START_COPY_TRIAL
+    OutputIterator rtrn = detail::copy_detect_random_access( ctrl, first, n, result, user_code, std::iterator_traits< InputIterator >::iterator_category( ) );
+BOLT_PROFILER_STOP_COPY_TRIAL
+    return rtrn;
 }
 
 }//end of cl namespace
@@ -127,11 +152,13 @@ class Copy_KernelTemplateSpecializer : public KernelTemplateSpecializer
 
     Copy_KernelTemplateSpecializer() : KernelTemplateSpecializer()
     {
-        addKernelName( "copy_I"     );
-        addKernelName( "copy_II"    );
-        addKernelName( "copy_III"   );
-        addKernelName( "copy_IV"    );
-        // addKernelName( "copy_V"     );
+        addKernelName( "copy_0"     );
+        addKernelName( "copy_I_SA"  );
+        addKernelName( "copy_II_LA" );
+        addKernelName( "copy_III_SB");
+        addKernelName( "copy_IV_LB" );
+        addKernelName( "copy_V_SC"  );
+        addKernelName( "copy_VI_LC" );
     }
     
     const ::std::string operator() ( const ::std::vector<::std::string>& typeNames ) const
@@ -169,6 +196,33 @@ class Copy_KernelTemplateSpecializer : public KernelTemplateSpecializer
             "template __attribute__((mangled_name(" + name(3) + "Instantiated)))\n"
             "__attribute__((reqd_work_group_size(256,1,1)))\n"
             "__kernel void " + name(3) + "(\n"
+            "global " + typeNames[copy_iType] + " * restrict src,\n"
+            "global " + typeNames[copy_oType] + " * restrict dst,\n"
+            "const uint numElements\n"
+            ");\n\n"
+
+            "// Dynamic specialization of generic template definition, using user supplied types\n"
+            "template __attribute__((mangled_name(" + name(4) + "Instantiated)))\n"
+            "__attribute__((reqd_work_group_size(256,1,1)))\n"
+            "__kernel void " + name(4) + "(\n"
+            "global " + typeNames[copy_iType] + " * restrict src,\n"
+            "global " + typeNames[copy_oType] + " * restrict dst,\n"
+            "const uint numElements\n"
+            ");\n\n"
+
+            "// Dynamic specialization of generic template definition, using user supplied types\n"
+            "template __attribute__((mangled_name(" + name(5) + "Instantiated)))\n"
+            "__attribute__((reqd_work_group_size(256,1,1)))\n"
+            "__kernel void " + name(5) + "(\n"
+            "global " + typeNames[copy_iType] + " * restrict src,\n"
+            "global " + typeNames[copy_oType] + " * restrict dst,\n"
+            "const uint numElements\n"
+            ");\n\n"
+
+            "// Dynamic specialization of generic template definition, using user supplied types\n"
+            "template __attribute__((mangled_name(" + name(6) + "Instantiated)))\n"
+            "__attribute__((reqd_work_group_size(256,1,1)))\n"
+            "__kernel void " + name(6) + "(\n"
             "global " + typeNames[copy_iType] + " * restrict src,\n"
             "global " + typeNames[copy_oType] + " * restrict dst,\n"
             "const uint numElements\n"
@@ -247,6 +301,11 @@ template< typename DVInputIterator, typename Size, typename DVOutputIterator >
 void copy_enqueue(const bolt::cl::control &ctrl, const DVInputIterator& first, const Size& n, 
     const DVOutputIterator& result, const std::string& cl_code)
 {
+#ifdef BOLT_PROFILER_ENABLED
+aProfiler.nextStep();
+aProfiler.setStepName("Acquire Kernel");
+aProfiler.set(AsyncProfiler::device, control::SerialCpu);
+#endif
     /**********************************************************************************
      * Type Names - used in KernelTemplateSpecializer
      *********************************************************************************/
@@ -264,7 +323,7 @@ void copy_enqueue(const bolt::cl::control &ctrl, const DVInputIterator& first, c
     PUSH_BACK_UNIQUE( typeDefs, ClCode< oType >::get() )
 
     const size_t workGroupSize  = 256; //kernelWithBoundsCheck.getWorkGroupInfo< CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE >( ctrl.device( ), &l_Error );
-    const size_t numComputeUnits = 40; //ctrl.device( ).getInfo< CL_DEVICE_MAX_COMPUTE_UNITS >( ); // = 28
+    const size_t numComputeUnits = 28; //ctrl.device( ).getInfo< CL_DEVICE_MAX_COMPUTE_UNITS >( ); // = 28
     const size_t numWorkGroupsPerComputeUnit = 10; //ctrl.wgPerComputeUnit( );
     const size_t numWorkGroups = numComputeUnits * numWorkGroupsPerComputeUnit;
     
@@ -304,24 +363,32 @@ void copy_enqueue(const bolt::cl::control &ctrl, const DVInputIterator& first, c
     /**********************************************************************************
      *  Kernel
      *********************************************************************************/
+#ifdef BOLT_PROFILER_ENABLED
+size_t k0e_stepNum, k0s_stepNum, k0_stepNum, ret_stepNum;
+aProfiler.nextStep();
+aProfiler.setStepName("Setup Kernel");
+aProfiler.set(AsyncProfiler::device, control::SerialCpu);
+#endif
     ::cl::Event kernelEvent;
     cl_int l_Error;
     try
     {
-        int whichKernel = 2;
+        int whichKernel = 6;
         cl_uint numThreadsChosen;
         cl_uint workGroupSizeChosen = workGroupSize;
         switch( whichKernel )
         {
-        case 0: // I: 1 thread per element
+        case 0: // 0: 1 thread per element
             numThreadsChosen = numThreadsRUP;
             break;
-        case 1: // II: 1 element per thread / BURST_SIZE
+        case 1: // I:   SA
+        case 3: // III: SB
+        case 5: // V:   SC
             numThreadsChosen = numThreadsRUP / BURST_SIZE;
             break;
-        case 2: // III: ideal threads
-        case 3: // IV: ideal threads w/ BURST
-        case 4: // V: ideal threads unrolled BURST
+        case 2: // II:  LA
+        case 4: // IV:  LB
+        case 6: // VI:  LC
             numThreadsChosen = numThreadsIdeal;
             break;
         } // switch
@@ -332,6 +399,22 @@ void copy_enqueue(const bolt::cl::control &ctrl, const DVInputIterator& first, c
         V_OPENCL( kernels[whichKernel].setArg( 1, result->getBuffer()),"Error setArg kernels[ 0 ]" ); // Input buffer
         V_OPENCL( kernels[whichKernel].setArg( 2, static_cast<cl_uint>( n ) ),                 "Error setArg kernels[ 0 ]" ); // Size of buffer
 
+
+#ifdef BOLT_PROFILER_ENABLED
+aProfiler.nextStep();
+aProfiler.setStepName("Enqueue Kernel");
+k0e_stepNum = aProfiler.getStepNum();
+aProfiler.set(AsyncProfiler::device, ctrl.forceRunMode());
+aProfiler.nextStep();
+aProfiler.setStepName("Submit Kernel");
+k0s_stepNum = aProfiler.getStepNum();
+aProfiler.set(AsyncProfiler::device, ctrl.forceRunMode());
+aProfiler.nextStep();
+aProfiler.setStepName("Kernel");
+k0_stepNum = aProfiler.getStepNum();
+aProfiler.set(AsyncProfiler::device, ctrl.forceRunMode());
+aProfiler.set(AsyncProfiler::memory, n*sizeof(iType) + n*sizeof(oType));
+#endif
         l_Error = ctrl.commandQueue( ).enqueueNDRangeKernel(
             kernels[whichKernel],
             ::cl::NullRange,
@@ -351,6 +434,110 @@ void copy_enqueue(const bolt::cl::control &ctrl, const DVInputIterator& first, c
 
     // wait for results
     bolt::cl::wait(ctrl, kernelEvent);
+
+#ifdef BOLT_PROFILER_ENABLED
+aProfiler.nextStep();
+aProfiler.setStepName("Returning Control To Device");
+ret_stepNum = aProfiler.getStepNum();
+aProfiler.set(AsyncProfiler::device, ctrl.forceRunMode());
+aProfiler.nextStep();
+aProfiler.setStepName("Querying Kernel Times");
+aProfiler.set(AsyncProfiler::device, control::SerialCpu);
+
+aProfiler.setDataSize(n*sizeof(iType));
+std::string strDeviceName = ctrl.device().getInfo< CL_DEVICE_NAME >( &l_Error );
+bolt::cl::V_OPENCL( l_Error, "Device::getInfo< CL_DEVICE_NAME > failed" );
+aProfiler.setArchitecture(strDeviceName);
+
+    try
+    {
+        cl_ulong k0enq, k0sub, k0start, k0stop;
+        //cl_ulong k1sub, k1start, k1stop;
+        //cl_ulong k2sub, k2start, k2stop;
+        //cl_ulong ret;
+
+        //cl_ulong k0_start, k0_stop, k1_stop, k2_stop;
+        //cl_ulong k1_start, k2_start;
+        
+        V_OPENCL( kernelEvent.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_QUEUED, &k0enq),   "getProfInfo" );
+        V_OPENCL( kernelEvent.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_SUBMIT, &k0sub),   "getProfInfo" );
+        V_OPENCL( kernelEvent.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_START,  &k0start), "getProfInfo" );
+        V_OPENCL( kernelEvent.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_END,    &k0stop),  "getProfInfo" );
+
+        //V_OPENCL( kernel1Event.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_SUBMIT, &k1sub),   "getProfInfo" );
+        //V_OPENCL( kernel1Event.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_START,  &k1start), "getProfInfo" );
+        //V_OPENCL( kernel1Event.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_END,    &k1stop),  "getProfInfo" );
+
+        //V_OPENCL( kernel2Event.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_SUBMIT, &k2sub),   "getProfInfo" );
+        //V_OPENCL( kernel2Event.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_START,  &k2start), "getProfInfo" );
+        //V_OPENCL( kernel2Event.getProfilingInfo<cl_ulong>(CL_PROFILING_COMMAND_END,    &k2stop),  "getProfInfo" );
+#if 0
+        printf("BEFORE\n");
+        printf("K0 Enque %10u ns CPU\n", aProfiler.get(k0e_stepNum, AsyncProfiler::startTime));
+        printf("K0 Enque %10u ns\n", k0enq);
+        printf("K0 Submt %10u ns\n", k0sub);
+        printf("K0 Start %10u ns\n", k0start);
+        printf("K0 Stop  %10u ns\n", k0stop);
+        printf("K1 Submt %10u ns\n", k1sub);
+        printf("K1 Start %10u ns\n", k1start);
+        printf("K1 Stop  %10u ns\n", k1stop);
+        printf("K2 Submt %10u ns\n", k2sub);
+        printf("K2 Start %10u ns\n", k2start);
+        printf("K2 Stop  %10u ns\n", k2stop);
+        printf("Return   %10u ns\n", aProfiler.get(ret_stepNum, AsyncProfiler::startTime) );
+        printf("Returned %10u ns\n", aProfiler.get(ret_stepNum, AsyncProfiler::stopTime) );
+#endif
+        // determine shift between cpu and gpu clock according to kernel 0 enqueue time
+        size_t k0_enq_cpu = aProfiler.get(k0e_stepNum, AsyncProfiler::startTime);
+        size_t k0_enq_gpu = static_cast<size_t>( k0enq );
+        long long shift = k0enq - k0_enq_cpu; // must be signed because can be '-'
+        //printf("\nSHIFT % 10u ns\n", shift );
+
+        // apply shift to all steps
+        aProfiler.set(k0e_stepNum, AsyncProfiler::startTime, static_cast<size_t>(k0enq  -shift) ); // same
+        aProfiler.set(k0e_stepNum, AsyncProfiler::stopTime,  static_cast<size_t>(k0sub  -shift) );
+        aProfiler.set(k0s_stepNum, AsyncProfiler::startTime, static_cast<size_t>(k0sub  -shift) );
+        aProfiler.set(k0s_stepNum, AsyncProfiler::stopTime,  static_cast<size_t>(k0start-shift) );
+        aProfiler.set(k0_stepNum,  AsyncProfiler::startTime, static_cast<size_t>(k0start-shift) );
+        aProfiler.set(k0_stepNum,  AsyncProfiler::stopTime,  static_cast<size_t>(k0stop -shift) );
+
+        //aProfiler.set(k1s_stepNum, AsyncProfiler::startTime, static_cast<size_t>(k0sub  -shift) );
+        //aProfiler.set(k1s_stepNum, AsyncProfiler::stopTime,  static_cast<size_t>(k1start-shift) );
+        //aProfiler.set(k1_stepNum,  AsyncProfiler::startTime, static_cast<size_t>(k1start-shift) );
+        //aProfiler.set(k1_stepNum,  AsyncProfiler::stopTime,  static_cast<size_t>(k1stop -shift) );
+
+        //aProfiler.set(k2s_stepNum, AsyncProfiler::startTime, static_cast<size_t>(k1stop -shift) );
+        //aProfiler.set(k2s_stepNum, AsyncProfiler::stopTime,  static_cast<size_t>(k2start-shift) );
+        //aProfiler.set(k2_stepNum,  AsyncProfiler::startTime, static_cast<size_t>(k2start-shift) );
+        //aProfiler.set(k2_stepNum,  AsyncProfiler::stopTime,  static_cast<size_t>(k2stop -shift) );
+
+        aProfiler.set(ret_stepNum, AsyncProfiler::startTime, static_cast<size_t>(k0stop -shift) );
+        // aProfiler.set(ret_stepNum, AsyncProfiler::stopTime,  static_cast<size_t>(k2_stop-shift) ); // same
+#if 0
+        printf("\nAFTER\n");
+        printf("K0 Enque %10u ns CPU\n", aProfiler.get(k0e_stepNum, AsyncProfiler::startTime) );
+        printf("K0 Enque %10u ns GPU\n", aProfiler.get(k0e_stepNum, AsyncProfiler::startTime) );
+        printf("K0 Submt %10u ns GPU\n", aProfiler.get(k0s_stepNum, AsyncProfiler::startTime) );
+        printf("K0 Start %10u ns GPU\n", aProfiler.get(k0_stepNum,  AsyncProfiler::startTime) );
+        printf("K0 Stop  %10u ns GPU\n", aProfiler.get(k0_stepNum,  AsyncProfiler::stopTime ) );
+        printf("K1 Submt %10u ns GPU\n", aProfiler.get(k1s_stepNum, AsyncProfiler::startTime) );
+        printf("K1 Start %10u ns GPU\n", aProfiler.get(k1_stepNum,  AsyncProfiler::startTime) );
+        printf("K1 Stop  %10u ns GPU\n", aProfiler.get(k1_stepNum,  AsyncProfiler::stopTime ) );
+        printf("K2 Submt %10u ns GPU\n", aProfiler.get(k2s_stepNum, AsyncProfiler::startTime) );
+        printf("K2 Start %10u ns GPU\n", aProfiler.get(k2_stepNum,  AsyncProfiler::startTime) );
+        printf("K2 Stop  %10u ns GPU\n", aProfiler.get(k2_stepNum,  AsyncProfiler::stopTime ) );
+        printf("Return   %10u ns GPU\n", aProfiler.get(ret_stepNum, AsyncProfiler::startTime) );
+        printf("Returned %10u ns CPU\n", aProfiler.get(ret_stepNum, AsyncProfiler::stopTime ) );
+#endif
+    }
+    catch( ::cl::Error& e )
+    {
+        std::cout << ( "Scan Benchmark error condition reported:" ) << std::endl << e.what() << std::endl;
+        return;
+    }
+
+
+#endif // ENABLE_PROFILING
 
 
     // profiling

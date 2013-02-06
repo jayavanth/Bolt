@@ -345,7 +345,7 @@ TEST (copyArrWithDiffTypes, IntAndFloats){
 #endif
    	sourceArr1 = (int *) malloc (arraySize* sizeof (int));
    	destArr1= (int *) malloc (arraySize * sizeof (int));
-   
+    
    	sourceFloatArr1 = (float*) malloc (arraySize* sizeof (float));
    	destFloatArr1	= (float *) malloc (arraySize * sizeof(float));
 #if TEST_DOUBLE
@@ -370,9 +370,9 @@ TEST (copyArrWithDiffTypes, IntAndFloats){
    	bolt::cl::control useThisControl = bolt::cl::control::getDefault();
    	
    	//copying int array as a whole to all there types of arrays :)
-   	bolt::cl::copy(useThisControl, sourceArr1, sourceArr1 + arraySize, destArr1);                   //no prob
+   	int *rtrn1 = bolt::cl::copy(useThisControl, sourceArr1, sourceArr1 + arraySize, destArr1);                   //no prob
     //cmpArrays(sourceArr1, destArr1, arraySize);
-   	bolt::cl::copy(useThisControl, sourceArr1, sourceArr1 + arraySize, destFloatArr1);				//no prob
+   	float *rtrn2 = bolt::cl::copy(useThisControl, sourceArr1, sourceArr1 + arraySize, destFloatArr1);				//no prob
     //cmpArrays(sourceArr1, destFloatArr1, arraySize);
 #if TEST_DOUBLE
    	bolt::cl::copy(useThisControl, sourceArr1, sourceArr1 + arraySize, destDoubleArr1);				//no prob

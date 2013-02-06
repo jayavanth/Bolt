@@ -16,52 +16,280 @@
 ***************************************************************************/
 #pragma OPENCL EXTENSION cl_amd_printf : enable
 //#define USE_AMD_HSA 1
-
-#if USE_AMD_HSA
+//#define BURST_SIZE 4
+//#define EXCLUSIVE 0
+//#define NUM_ELEMENTS 1024*1024
+//#define WG_SIZE 256
+//#define LOG2_WG_SIZE 8
+//#define NUM_WG 280
+//#define NUM_ELEMENTS_PER_WG NUM_ELEMENTS/NUM_WG // on cpu
+//#define NUM_ELEMENTS_PER_ITER WG_SIZE*BURST_SIZE
+//#define NUM_BLOCK_ITER NUM_ELEMENTS_PER_WG/NUM_ELEMENTS_PER_ITER
+#define USE_SCAN_20 1
+#if USE_SCAN_20
 
 /******************************************************************************
- *  HSA Kernel
+ *  Fast Kernel A
  *****************************************************************************/
 template< typename iType, typename oType, typename initType, typename BinaryFunction >
-kernel void HSA_Scan(
-    global oType    *output,
-    global iType    *input,
-    initType        init,
-    const uint      numElements,
-    const uint      numIterations,
-    local oType     *lds,
-    global BinaryFunction* binaryOp,
-    global oType    *intermediateScanArray,
-    global int      *dev2host,
-    global int      *host2dev,
-    int             exclusive)
+kernel void scan_I_A(
+    global  oType           *output, // don't access
+    global  iType           *input,
+            initType         init,
+    local   oType           *lds,
+    global  BinaryFunction  *binaryOp,
+    global  oType           *intermediateScanArray )
 {
-    size_t gloId = get_global_id( 0 );
-    size_t groId = get_group_id( 0 );
-    size_t locId = get_local_id( 0 );
-    size_t wgSize = get_local_size( 0 );
+#define gloId get_global_id( 0 )
+#define groId get_group_id( 0 )
+#define locId get_local_id( 0 )
 
-    // report P1 completion
-    intermediateScanArray[ groId ] = input[ groId ];
-    dev2host[ groId ] = 1;
+    const int wgBegin = groId*NUM_ELEMENTS_PER_WG;
+    __local oType prevScan;
+    prevScan = input[0];
 
-   
-
-    // wait for P2 completion
-    for (size_t i = 0; i < 10000; i++ )
+    // block iterations
+    for (int blockIter = 0; blockIter < NUM_BLOCK_ITER; blockIter++ )
     {
-        mem_fence(CLK_GLOBAL_MEM_FENCE);
-        //printf("DEV: interScan[%i]=%i ( %i, %i )", groId, intermediateScanArray[groId], dev2host[groId], host2dev[groId]);
-        if ( host2dev[ groId] == 2 )
-        { // host reported P2 completion
-            // report P3 completion
-            dev2host[ groId ] = 3;
-            break;
+        int elemAddr = wgBegin+blockIter*NUM_ELEMENTS_PER_ITER+get_local_id(0)*BURST_SIZE;
+        oType sum = input[elemAddr+0];
+#if BURST_SIZE>1
+        oType in1 = input[elemAddr+1];
+#endif
+#if BURST_SIZE>2
+        oType in2 = input[elemAddr+2];
+        oType in3 = input[elemAddr+3];
+#endif
+#if BURST_SIZE>4
+        oType in4 = input[elemAddr+4];
+        oType in5 = input[elemAddr+5];
+        oType in6 = input[elemAddr+6];
+        oType in7 = input[elemAddr+7];
+#endif
+#if BURST_SIZE>1
+        sum = (*binaryOp)( sum, in1 );
+#endif
+#if BURST_SIZE>2
+        sum = (*binaryOp)( sum, in2 );
+        sum = (*binaryOp)( sum, in3 );
+#endif
+#if BURST_SIZE>4
+        sum = (*binaryOp)( sum, in4 );
+        sum = (*binaryOp)( sum, in5 );
+        sum = (*binaryOp)( sum, in6 );
+        sum = (*binaryOp)( sum, in7 );
+#endif
+        //  Computes a scan within a workgroup
+        int offset = 1;
+        for( int locRedIter = 0; locRedIter < LOG2_WG_SIZE; locRedIter++ )
+        {
+            lds[ locId ] = sum;
+            barrier( CLK_LOCAL_MEM_FENCE );
+            if (locId >= offset)
+            {
+                oType tmp = lds[ locId - offset ];
+                sum = (*binaryOp)( sum, tmp );
+            }
+            barrier( CLK_LOCAL_MEM_FENCE );
+            offset *= 2;
+        }
+        if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+        {
+            oType tmp = prevScan;
+            prevScan = (blockIter==0) ? sum : (*binaryOp)(tmp, sum);
+        }
+
+        
+        // write out scan value for each wg
+        // this will be faster than writing value for each
+        // thread (since we have suboptimal access pattern in this kernel
+        // then next kernel can have ideal access pattern
+        // write to tmp array here
+#if 0
+        if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+        {
+            intermediateScanArray[blockIter*NUM_WG+groId] = prevScan;
+        }
+#endif
+#if 0
+        intermediateScanArray[ elemAddr ] = sum;
+#endif
+    }
+#if 1
+    if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+    {
+        intermediateScanArray[groId] = prevScan;
+    }
+#endif
+}
+
+/******************************************************************************
+ *  Fast Kernel B
+ *****************************************************************************/
+template< typename iType, typename oType, typename initType, typename BinaryFunction >
+kernel void scan_I_B(
+    global  oType           *output, // don't access
+    global  iType           *input,
+            initType         init,
+    local   oType           *lds,
+    global  BinaryFunction  *binaryOp,
+    global  oType           *intermediateScanArray )
+{
+#define gloId get_global_id( 0 )
+#define groId get_group_id( 0 )
+#define locId get_local_id( 0 )
+
+    const int wgBegin = groId*NUM_ELEMENTS_PER_WG;
+    __local oType prevScan;
+
+    // global reduction
+    int globElemAddr = locId*BURST_SIZE;
+    oType gloSum = intermediateScanArray[ globElemAddr+0 ];
+    oType gloIn1 = intermediateScanArray[ globElemAddr+1 ];
+    oType gloIn2 = intermediateScanArray[ globElemAddr+2 ];
+    oType gloIn3 = intermediateScanArray[ globElemAddr+3 ];
+    gloSum = (*binaryOp)( gloSum, gloIn1 );
+    gloSum = (*binaryOp)( gloSum, gloIn2 );
+    gloSum = (*binaryOp)( gloSum, gloIn3 );
+
+    int offset = 1;
+    for( int gloRedIter = 0; gloRedIter < LOG2_WG_SIZE; gloRedIter++ )
+    {
+        lds[ locId ] = sum;
+        barrier( CLK_LOCAL_MEM_FENCE );
+        if (locId >= offset)
+        {
+            oType tmp = lds[ locId - offset ];
+            sum = (*binaryOp)( sum, tmp );
+        }
+        barrier( CLK_LOCAL_MEM_FENCE );
+        offset *= 2;
+    }
+    
+    if ( gloId > 0 )
+    {
+        int prefixThread = (gloId-1)/BURST_SIZE;
+        int prefixThreadReg = (gloId-1)%BURST_SIZE;
+        if ( locId==prefixThread )
+        {
+            preScan = prefixThread==0 ? gloSum : prefixThread==1 ? gloIn1 : prefixThread==2 ? gloIn2 : gloIn3;
         }
     }
+    barrier( CLK_LOCAL_MEM_FENCE );
+
+
+
+    // block iterations
+    for (int blockIter = 0; blockIter < NUM_BLOCK_ITER; blockIter++ )
+    {
+        int elemAddr = wgBegin+blockIter*NUM_ELEMENTS_PER_ITER+get_local_id(0)*1 /*BURST_SIZE*/;
+        oType sum = input[elemAddr];
+
+        // perpetuate prefix
+        if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+        {
+            oType tmp = prevScan;
+            prevScan = (blockIter==0) ? sum : (*binaryOp)(tmp, sum);
+        }
+
+        //  Computes a scan within a workgroup
+        int offset = 1;
+        for( int locRedIter = 0; locRedIter < LOG2_WG_SIZE; locRedIter++ )
+        {
+            lds[ locId ] = sum;
+            barrier( CLK_LOCAL_MEM_FENCE );
+            if (locId >= offset)
+            {
+                oType tmp = lds[ locId - offset ];
+                sum = (*binaryOp)( sum, tmp );
+            }
+            barrier( CLK_LOCAL_MEM_FENCE );
+            offset *= 2;
+        }
+
+        // write final value
+        output[ elemAddr ] = sum;
+
+        // perpetuate prefix
+        if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+        {
+            oType tmp = prevScan;
+            prevScan = (blockIter==0) ? sum : (*binaryOp)(tmp, sum);
+        }
+    } // block iter
+} // kernel
+
+
+template< typename iType, typename oType, typename initType, typename BinaryFunction >
+kernel void scan_II_A(
+    global  oType           *output,
+    global  iType           *input,
+            initType         init,
+    local   oType           *lds,
+    global  BinaryFunction  *binaryOp,
+    global  oType           *intermediateScanArray )
+{
+#define gloId get_global_id( 0 )
+#define groId get_group_id( 0 )
+#define locId get_local_id( 0 )
+
+    const uint wgBegin = groId*NUM_ELEMENTS_PER_WG;
+    __local oType prevScan;
+    prevScan = input[0];
+
+    // block iterations
+    for (int blockIter = 0; blockIter < NUM_BLOCK_ITER; blockIter++ )
+    {
+        int elemAddr = wgBegin+blockIter*NUM_ELEMENTS_PER_ITER+get_local_id(0)*BURST_SIZE;
+        oType in0 = input[elemAddr+0];
+        oType in1 = input[elemAddr+1];
+        oType sum = (*binaryOp)( in0, in1 );
+        //  Computes a scan within a workgroup
+        int offset = 1;
+        for( int locRedIter = 0; locRedIter < LOG2_WG_SIZE; locRedIter++ )
+        {
+            lds[ locId ] = sum;
+            barrier( CLK_LOCAL_MEM_FENCE );
+            if (locId >= offset)
+            {
+                oType tmp = lds[ locId - offset ];
+                sum = (*binaryOp)( sum, tmp );
+            }
+            barrier( CLK_LOCAL_MEM_FENCE );
+            offset *= 2;
+        }
+        if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+        {
+            oType tmp = prevScan;
+            prevScan = (blockIter==0) ? sum : (*binaryOp)(tmp, sum);
+        }
+
+        
+        // write out scan value for each wg
+        // this will be faster than writing value for each
+        // thread (since we have suboptimal access pattern in this kernel
+        // then next kernel can have ideal access pattern
+        // write to tmp array here
+#if 0
+        if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+        {
+            intermediateScanArray[blockIter*NUM_WG+groId] = prevScan;
+        }
+#endif
+#if 1
+        intermediateScanArray[ elemAddr ] = sum;
+#endif
+    }
+#if 0
+    if (locId == (WG_SIZE-1) ) // last thread in wg stores final scan value
+    {
+        intermediateScanArray[groId] = prevScan;
+    }
+#endif
 }
 
 
+#else
 
 
 
@@ -69,7 +297,6 @@ kernel void HSA_Scan(
 /******************************************************************************
  *  Not Using HSA
  *****************************************************************************/
-#else
 
 #define NUM_ITER 16
 #define MIN(X,Y) X<Y?X:Y;
@@ -363,5 +590,4 @@ kernel void perBlockInclusiveScan(
     }
 }
 
-// not using HSA
 #endif
