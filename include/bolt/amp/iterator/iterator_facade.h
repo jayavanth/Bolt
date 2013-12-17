@@ -24,7 +24,6 @@
 */
 
 namespace bolt {
-namespace amp {
 
     template <
         class Derived             // The derived iterator type being constructed
@@ -34,12 +33,6 @@ namespace amp {
             , class Difference = std::ptrdiff_t
     >
     class iterator_facade
-# ifdef BOOST_ITERATOR_FACADE_NEEDS_ITERATOR_BASE
-        : public boost::detail::iterator_facade_types<
-        Value, CategoryOrTraversal, Reference, Difference
-        >::base
-#  undef BOOST_ITERATOR_FACADE_NEEDS_ITERATOR_BASE
-# endif
     {
     private:
         //
@@ -54,15 +47,6 @@ namespace amp {
         {
             return *static_cast<Derived const*>(this);
         }
-
-        typedef boost::detail::iterator_facade_types<
-            Value, CategoryOrTraversal, Reference, Difference
-        > associated_types;
-
-        typedef boost::detail::operator_arrow_dispatch<
-            Reference
-            , typename associated_types::pointer
-        > operator_arrow_dispatch_;
 
     protected:
         // For use by derived classes
@@ -105,17 +89,6 @@ namespace amp {
             return this->derived();
         }
 
-# if BOOST_WORKAROUND(BOOST_MSVC, < 1300)
-        typename boost::detail::postfix_increment_result<Derived, Value, Reference, CategoryOrTraversal>::type
-            operator++(int)
-        {
-                typename boost::detail::postfix_increment_result<Derived, Value, Reference, CategoryOrTraversal>::type
-                    tmp(this->derived());
-                ++*this;
-                return tmp;
-            }
-# endif
-
         Derived& operator--()
         {
             iterator_core_access::decrement(this->derived());
@@ -147,22 +120,10 @@ namespace amp {
             return result -= x;
         }
 
-# if BOOST_WORKAROUND(BOOST_MSVC, < 1300)
-        // There appears to be a bug which trashes the data of classes
-        // derived from iterator_facade when they are assigned unless we
-        // define this assignment operator.  This bug is only revealed
-        // (so far) in STLPort debug mode, but it's clearly a codegen
-        // problem so we apply the workaround for all MSVC6.
-        iterator_facade& operator=(iterator_facade const&)
-        {
-            return *this;
-        }
-# endif
     };
 
     
 
-}
 };
 
 #endif

@@ -17,8 +17,8 @@
 #pragma once
 #if !defined( BOLT_CL_CONSTANT_ITERATOR_H )
 #define BOLT_CL_CONSTANT_ITERATOR_H
-#include "bolt/cl/bolt.h"
-#include "bolt/cl/iterator/iterator_traits.h"
+#include "bolt/amp/bolt.h"
+#include "bolt/amp/iterator/iterator_traits.h"
 #include <boost/iterator/iterator_facade.hpp>
 
 /*! \file bolt/cl/iterator/constant_iterator.h
@@ -27,22 +27,23 @@
 
 
 namespace bolt {
-namespace cl {
+namespace amp {
 
     struct constant_iterator_tag
         : public fancy_iterator_tag
         {   // identifying tag for random-access iterators
         };
 
-    //  This represents the host side definition of the constant_iterator template
-    //BOLT_TEMPLATE_FUNCTOR3( constant_iterator, int, float, double,
         template< typename value_type >
-        class constant_iterator: public boost::iterator_facade< constant_iterator< value_type >, value_type, 
-            constant_iterator_tag, value_type, int >
+        class constant_iterator: public boost::iterator_facade< constant_iterator< value_type >, value_type,
+          constant_iterator_tag, value_type, int >
         {
         public:
              typedef typename boost::iterator_facade< constant_iterator< value_type >, value_type, 
-            constant_iterator_tag, value_type, int >::difference_type difference_type;
+             constant_iterator_tag, value_type, int >::difference_type difference_type;
+             typedef concurrency::array_view< value_type > arrayview_type;
+
+             typedef constant_iterator<value_type> const_iterator;
            
 
             struct Payload
@@ -54,22 +55,18 @@ namespace cl {
             constant_iterator( value_type init, const control& ctl = control::getDefault( ) ): 
                 m_constValue( init ), m_Index( 0 )
             {
-                const ::cl::CommandQueue& m_commQueue = ctl.getCommandQueue( );
-
-                //  We want to use the context from the passed in commandqueue to initialize our buffer
-                cl_int l_Error = CL_SUCCESS;
-                ::cl::Context l_Context = m_commQueue.getInfo< CL_QUEUE_CONTEXT >( &l_Error );
-                V_OPENCL( l_Error, "device_vector failed to query for the context of the ::cl::CommandQueue object" );
-
-                m_devMemory = ::cl::Buffer( l_Context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR,
-                    1 * sizeof( value_type ),const_cast<value_type *>(&m_constValue) );
+              //int m_Size = 1;
+              //std::vector<value_type> temp(1, m_constValue);
+              //concurrency::extent<1> ext( static_cast< int >( m_Size ) );
+              //m_devMemory = new concurrency::array<value_type, 1>(ext, temp.begin(), ctl.getAccelerator( ).default_view );
+              
             }
 
             //  This copy constructor allows an iterator to convert into a const_iterator, but not vica versa
-            template< typename OtherType >
-            constant_iterator( const constant_iterator< OtherType >& rhs ): m_devMemory( rhs.m_devMemory ),
-                m_Index( rhs.m_Index ), m_constValue( rhs.m_constValue )
-            {}
+           template< typename OtherType >
+           constant_iterator( const constant_iterator< OtherType >& rhs ): m_devMemory( rhs.m_devMemory ),
+               m_Index( rhs.m_Index ), m_constValue( rhs.m_constValue )
+           {}
 
             //  This copy constructor allows an iterator to convert into a const_iterator, but not vica versa
             constant_iterator< value_type >& operator= ( const constant_iterator< value_type >& rhs )
@@ -77,7 +74,7 @@ namespace cl {
                 if( this == &rhs )
                     return *this;
 
-                m_devMemory = rhs.m_devMemory;
+                //m_devMemory = rhs.m_devMemory;
                 m_constValue = rhs.m_constValue;
                 m_Index = rhs.m_Index;
                 return *this;
@@ -96,26 +93,61 @@ namespace cl {
                 return result;
             }
 
-            const ::cl::Buffer& getBuffer( ) const
+            //value_type constant_iterator< value_type > operator[] (unsigned int &i) restrict(cpu, amp)
+            //{
+            //  return m_constValue;
+            //}
+
+            arrayview_type getBuffer() const
             {
-                return m_devMemory;
+               // return m_devMemory;
             }
 
-          const constant_iterator< value_type > & getContainer( ) const
+            //arrayview_type getBuffer(const_iterator itr) const
+            //{
+            //  //difference_type offset = 1;//itr.getIndex();
+            //  //concurrency::extent<1> ext( static_cast< int >( 1 /*m_Size-offset*/ ));
+            //  //return m_devMemory->section( Concurrency::index<1>((int)1), ext );
+            //
+
+            //  ////return m_devMemory->reinterpret_as<value_type>();
+            //  return m_constValue;
+            //  
+            //}
+
+
+
+            //int getBuffer(const_iterator itr) const
+            //{
+            //  //difference_type offset = 1;//itr.getIndex();
+            //  //concurrency::extent<1> ext( static_cast< int >( 1 /*m_Size-offset*/ ));
+            //  //return m_devMemory->section( Concurrency::index<1>((int)1), ext );
+            //
+            //  return m_constValue;
+            //  
+            //}
+
+            const constant_iterator< value_type > & getBuffer( const_iterator itr ) const
+            {
+                return *this;
+            }
+            
+
+            const constant_iterator< value_type > & getContainer( ) const
             {
                 return *this;
             }
 
-            Payload gpuPayload( ) const
-            {
-                Payload payload = { m_constValue };
-                return payload;
-            }
+            //Payload gpuPayload( ) const
+            //{
+            //    Payload payload = { m_constValue };
+            //    return payload;
+            //}
 
-            const difference_type gpuPayloadSize( ) const
-            {
-                return sizeof( Payload );
-            }
+            //const difference_type gpuPayloadSize( ) const
+            //{
+            //    return sizeof( Payload );
+            //}
 
             difference_type distance_to( const constant_iterator< value_type >& rhs ) const
             {
@@ -126,7 +158,7 @@ namespace cl {
             //  Public member variables
             difference_type m_Index;
 
-        private:
+       // private:
             //  Implementation detail of boost.iterator
             friend class boost::iterator_core_access;
 
@@ -149,6 +181,11 @@ namespace cl {
                 advance( -1 );
             }
 
+            difference_type getIndex() const
+            {
+                return m_Index;
+            }
+
             template< typename OtherType >
             bool equal( const constant_iterator< OtherType >& rhs ) const
             {
@@ -157,51 +194,35 @@ namespace cl {
                 return sameIndex;
             }
 
+
+
             typename boost::iterator_facade< constant_iterator< value_type >, value_type, 
             constant_iterator_tag, value_type, int >::reference dereference( ) const
             {
-                return m_constValue;
+              //value_type tmp = *(m_devMemory->data());
+              //return tmp;
+
+              //return *(m_devMemory->data());
+
+              return m_constValue;
+
             }
 
-            ::cl::Buffer m_devMemory;
+
+            int operator[](int x) const restrict(cpu,amp) // Uncomment if using iterator in inl
+            {
+              int xy = m_constValue;
+              return xy;
+              //return *(m_Ptr->data());
+            }
+
+
+            //concurrency::array<value_type>* m_devMemory;
+            //concurrency::array_view<value_type>* m_Ptr;
             value_type m_constValue;
         };
     //)
 
-    //  This string represents the device side definition of the constant_iterator template
-    static std::string deviceConstantIterator = STRINGIFY_CODE( 
-        namespace bolt { namespace cl { \n
-        template< typename T > \n
-        class constant_iterator \n
-        { \n
-        public: \n
-            typedef int iterator_category;      // device code does not understand std:: tags \n
-            typedef T value_type; \n
-            typedef size_t difference_type; \n
-            typedef size_t size_type; \n
-            typedef T* pointer; \n
-            typedef T& reference; \n
-
-            constant_iterator( value_type init ): m_constValue( init ), m_Ptr( 0 ) \n
-            { }; \n
-
-            void init( global value_type* ptr ) \n
-            { }; \n
-
-            value_type operator[]( size_type threadID ) const \n
-            { \n
-                return m_constValue; \n
-            } \n
-
-            value_type operator*( ) const \n
-            { \n
-                return m_constValue; \n
-            } \n
-
-            value_type m_constValue; \n
-        }; \n
-    } } \n
-    );
 
     template< typename Type >
     constant_iterator< Type > make_constant_iterator( Type constValue )
@@ -213,11 +234,5 @@ namespace cl {
 }
 }
 
-BOLT_CREATE_TYPENAME( bolt::cl::constant_iterator< int > );
-BOLT_CREATE_CLCODE( bolt::cl::constant_iterator< int >, bolt::cl::deviceConstantIterator );
-
-BOLT_TEMPLATE_REGISTER_NEW_TYPE( bolt::cl::constant_iterator, int, unsigned int );
-BOLT_TEMPLATE_REGISTER_NEW_TYPE( bolt::cl::constant_iterator, int, float );
-BOLT_TEMPLATE_REGISTER_NEW_TYPE( bolt::cl::constant_iterator, int, double );
 
 #endif
