@@ -129,8 +129,8 @@ namespace bolt
 			   else
 				    boundsCheck = 1;
 
-			   concurrency::array_view<iType,1> inputV (first.getContainer().getBuffer(first));
-               concurrency::array_view<oType,1> resultV(result.getContainer().getBuffer(result));
+               auto inputV = first.getContainer().getBuffer(first);
+               auto resultV = result.getContainer().getBuffer(result);
                concurrency::extent< 1 > inputExtent( wavefrontMultiple );
 
                concurrency::parallel_for_each(ctl.getAccelerator().default_view, inputExtent, [=](concurrency::index<1> idx) restrict(amp)
