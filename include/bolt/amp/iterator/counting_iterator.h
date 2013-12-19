@@ -35,14 +35,13 @@ namespace amp {
         };
 
         template< typename value_type >
-        class counting_iterator: public boost::iterator_facade< counting_iterator< value_type >, value_type,
-          counting_iterator_tag, value_type, int >
+        class counting_iterator: public std::iterator< counting_iterator_tag, typename value_type, int>
         {
         public:
              typedef typename boost::iterator_facade< counting_iterator< value_type >, value_type, 
              counting_iterator_tag, value_type, int >::difference_type difference_type;
-             typedef concurrency::array_view< value_type > arrayview_type;
 
+             typedef concurrency::array_view< value_type > arrayview_type;
              typedef counting_iterator<value_type> const_iterator;
            
 
@@ -90,17 +89,15 @@ namespace amp {
                 return *this;
             }
 
-            difference_type distance_to( const counting_iterator< value_type >& rhs ) const
+            difference_type operator- ( const counting_iterator< value_type >& rhs ) const
             {
-                return rhs.m_Index - m_Index;
+                return m_Index - rhs.m_Index;
             }
 
             //  Public member variables
             difference_type m_Index;
 
-       // private:
-            //  Implementation detail of boost.iterator
-            friend class boost::iterator_core_access;
+       //private:
 
             //  Used for templatized copy constructor and the templatized equal operator
             template < typename > friend class counting_iterator;
@@ -111,12 +108,12 @@ namespace amp {
                 m_Index += n;
             }
 
-            void increment( )
+            void operator++( )
             {
                 advance( 1 );
             }
 
-            void decrement( )
+            void operator--( )
             {
                 advance( -1 );
             }
@@ -127,24 +124,39 @@ namespace amp {
             }
 
             template< typename OtherType >
-            bool equal( const counting_iterator< OtherType >& rhs ) const
+            bool operator== ( const counting_iterator< OtherType >& rhs ) const
             {
                 bool sameIndex = (rhs.m_initValue == m_initValue) && (rhs.m_Index == m_Index);
 
                 return sameIndex;
             }
 
-
-
-            typename boost::iterator_facade< counting_iterator< value_type >, value_type, 
-            counting_iterator_tag, value_type, int >::reference dereference( ) const
+            template< typename OtherType >
+            bool operator!= ( const counting_iterator< OtherType >& rhs ) const
             {
-              return m_initValue + m_Index;
+                bool sameIndex = (rhs.m_initValue != m_initValue) || (rhs.m_Index != m_Index);
 
+                return sameIndex;
+            }
+
+            // Do we need this? Debug error
+            template< typename OtherType >
+            bool operator< ( const counting_iterator< OtherType >& rhs ) const
+            {
+                bool sameIndex = (rhs.m_Index < m_Index);
+
+                return sameIndex;
+            }
+
+            // Dereference operators
+            int operator*() const restrict(cpu,amp)
+            {
+              int xy = m_initValue;
+              return xy;
             }
 
 
-            int operator[](int x) const restrict(cpu,amp) // Uncomment if using iterator in inl
+            int operator[](int x) const restrict(cpu,amp)
             {
               int temp = x + m_initValue;
               return temp;

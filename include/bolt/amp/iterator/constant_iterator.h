@@ -35,15 +35,16 @@ namespace amp {
         };
 
         template< typename value_type >
-        class constant_iterator: public boost::iterator_facade< constant_iterator< value_type >, value_type,
-          constant_iterator_tag, value_type, int >
+        class constant_iterator: public std::iterator< constant_iterator_tag, typename value_type, int>
         {
         public:
-             typedef typename boost::iterator_facade< constant_iterator< value_type >, value_type, 
-             constant_iterator_tag, value_type, int >::difference_type difference_type;
-             typedef concurrency::array_view< value_type > arrayview_type;
+             //typedef typename std::iterator< constant_iterator< value_type >, value_type, 
+             //constant_iterator_tag, value_type, int >::difference_type difference_type;
+             typedef int difference_type;
 
+             typedef concurrency::array_view< value_type > arrayview_type;
              typedef constant_iterator<value_type> const_iterator;
+             typedef 
            
 
             struct Payload
@@ -53,20 +54,12 @@ namespace amp {
 
             //  Basic constructor requires a reference to the container and a positional element
             constant_iterator( value_type init, const control& ctl = control::getDefault( ) ): 
-                m_constValue( init ), m_Index( 0 )
-            {
-              //int m_Size = 1;
-              //std::vector<value_type> temp(1, m_constValue);
-              //concurrency::extent<1> ext( static_cast< int >( m_Size ) );
-              //m_devMemory = new concurrency::array<value_type, 1>(ext, temp.begin(), ctl.getAccelerator( ).default_view );
-              
-            }
+                m_constValue( init ), m_Index( 0 ){}
 
             //  This copy constructor allows an iterator to convert into a const_iterator, but not vica versa
            template< typename OtherType >
            constant_iterator( const constant_iterator< OtherType >& rhs ): m_devMemory( rhs.m_devMemory ),
-               m_Index( rhs.m_Index ), m_constValue( rhs.m_constValue )
-           {}
+               m_Index( rhs.m_Index ), m_constValue( rhs.m_constValue ){}
 
             //  This copy constructor allows an iterator to convert into a const_iterator, but not vica versa
             constant_iterator< value_type >& operator= ( const constant_iterator< value_type >& rhs )
@@ -74,7 +67,6 @@ namespace amp {
                 if( this == &rhs )
                     return *this;
 
-                //m_devMemory = rhs.m_devMemory;
                 m_constValue = rhs.m_constValue;
                 m_Index = rhs.m_Index;
                 return *this;
@@ -93,14 +85,8 @@ namespace amp {
                 return result;
             }
 
-            //value_type constant_iterator< value_type > operator[] (unsigned int &i) restrict(cpu, amp)
-            //{
-            //  return m_constValue;
-            //}
-
             arrayview_type getBuffer() const
             {
-               // return m_devMemory;
             }
 
             //arrayview_type getBuffer(const_iterator itr) const
@@ -149,18 +135,16 @@ namespace amp {
             //    return sizeof( Payload );
             //}
 
-            difference_type distance_to( const constant_iterator< value_type >& rhs ) const
+            difference_type operator- ( const constant_iterator< value_type >& rhs ) const
             {
                 //return static_cast< typename iterator_facade::difference_type >( 1 );
-                return rhs.m_Index - m_Index;
+                return m_Index - rhs.m_Index;
             }
 
             //  Public member variables
             difference_type m_Index;
 
-       // private:
-            //  Implementation detail of boost.iterator
-            friend class boost::iterator_core_access;
+       //private:
 
             //  Used for templatized copy constructor and the templatized equal operator
             template < typename > friend class constant_iterator;
@@ -171,12 +155,12 @@ namespace amp {
                 m_Index += n;
             }
 
-            void increment( )
+            void operator++( )
             {
                 advance( 1 );
             }
 
-            void decrement( )
+            void operator--( )
             {
                 advance( -1 );
             }
@@ -186,30 +170,62 @@ namespace amp {
                 return m_Index;
             }
 
+            //template< typename OtherType >
+            //bool equal( const constant_iterator< OtherType >& rhs ) const
+            //{
+            //    bool sameIndex = (rhs.m_constValue == m_constValue) && (rhs.m_Index == m_Index);
+
+            //    return sameIndex;
+            //}
+
             template< typename OtherType >
-            bool equal( const constant_iterator< OtherType >& rhs ) const
+            bool operator== ( const constant_iterator< OtherType >& rhs ) const
             {
                 bool sameIndex = (rhs.m_constValue == m_constValue) && (rhs.m_Index == m_Index);
 
                 return sameIndex;
             }
 
-
-
-            typename boost::iterator_facade< constant_iterator< value_type >, value_type, 
-            constant_iterator_tag, value_type, int >::reference dereference( ) const
+            template< typename OtherType >
+            bool operator!= ( const constant_iterator< OtherType >& rhs ) const
             {
-              //value_type tmp = *(m_devMemory->data());
-              //return tmp;
+                bool sameIndex = (rhs.m_constValue != m_constValue) || (rhs.m_Index != m_Index);
 
-              //return *(m_devMemory->data());
+                return sameIndex;
+            }
 
-              return m_constValue;
+            // Do we need this? Debug error
+            template< typename OtherType >
+            bool operator< ( const constant_iterator< OtherType >& rhs ) const
+            {
+                bool sameIndex = (rhs.m_Index < m_Index);
 
+                return sameIndex;
             }
 
 
-            int operator[](int x) const restrict(cpu,amp) // Uncomment if using iterator in inl
+
+            //typename boost::iterator_facade< constant_iterator< value_type >, value_type, 
+            //constant_iterator_tag, value_type, int >::reference dereference( ) const
+            //{
+            //  //value_type tmp = *(m_devMemory->data());
+            //  //return tmp;
+            //
+            //  //return *(m_devMemory->data());
+            //
+            //  return m_constValue;
+            //
+            //}
+
+            int operator*() const restrict(cpu,amp)
+            {
+              int xy = m_constValue;
+              return xy;
+              //return *(m_Ptr->data());
+            }
+
+
+            int operator[](int x) const restrict(cpu,amp)
             {
               int xy = m_constValue;
               return xy;

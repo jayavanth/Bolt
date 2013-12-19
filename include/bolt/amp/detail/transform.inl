@@ -207,7 +207,8 @@ namespace bolt
                                      const InputIterator1& last1,
                                      const InputIterator2& first2,
                                      const OutputIterator& result,
-                                     const BinaryFunction& f)
+                                     const BinaryFunction& f,
+                                     std::random_access_iterator_tag)
             {
                 typedef std::iterator_traits<InputIterator1>::value_type iType1;
                 typedef std::iterator_traits<InputIterator2>::value_type iType2;
@@ -262,7 +263,8 @@ namespace bolt
                                      const DVInputIterator1& last1,
                                      const DVInputIterator2& first2,
                                      const DVOutputIterator& result,
-                                     const BinaryFunction& f )
+                                     const BinaryFunction& f,
+                                     bolt::amp::device_vector_tag)
             {
                typedef std::iterator_traits< DVInputIterator1 >::value_type iType1;
                typedef std::iterator_traits< DVInputIterator2 >::value_type iType2;
@@ -322,7 +324,8 @@ namespace bolt
                                            const InputIterator& first,
                                            const InputIterator& last,
                                            const OutputIterator& result,
-                                           const UnaryFunction& f)
+                                           const UnaryFunction& f,
+                                           std::random_access_iterator_tag)
             {
                 typedef std::iterator_traits<InputIterator>::value_type iType;
                 typedef std::iterator_traits<OutputIterator>::value_type oType;
@@ -376,7 +379,8 @@ namespace bolt
                                            const DVInputIterator& first,
                                            const DVInputIterator& last,
                                            const DVOutputIterator& result,
-                                           const UnaryFunction& f )
+                                           const UnaryFunction& f,
+                                           bolt::amp::device_vector_tag)
             {
 
               typedef std::iterator_traits< DVInputIterator >::value_type iType;
@@ -411,6 +415,47 @@ namespace bolt
                 bolt::amp::device_vector< oType >::pointer resPtr = result.getContainer( ).data( );
 
                 bolt::btbb::transform( &firstPtr[ first.m_Index ],  &firstPtr[ first.m_Index  + sz ], &resPtr[ result.m_Index], f);
+#else
+                throw std::exception(  "The MultiCoreCpu version of transform is not enabled to be built." );
+#endif
+                return;
+             }
+             else
+             {
+                transform_unary_enqueue( ctl, first, last, result, f);
+             }
+         };
+
+         template<typename DVInputIterator, typename DVOutputIterator, typename UnaryFunction>
+         void transform_unary_pick_iterator( bolt::amp::control &ctl,
+                                           const DVInputIterator& first,
+                                           const DVInputIterator& last,
+                                           const DVOutputIterator& result,
+                                           const UnaryFunction& f,
+                                           bolt::amp::fancy_iterator_tag)
+            {
+
+              typedef std::iterator_traits< DVInputIterator >::value_type iType;
+              typedef std::iterator_traits< DVOutputIterator >::value_type oType;
+
+              size_t sz = std::distance( first, last );
+              if( sz == 0 )
+                  return;
+
+              const bolt::amp::control::e_RunMode runMode = ctl.getForceRunMode();  // could be dynamic choice some day.
+
+              //  TBB does not have an equivalent for two input iterator std::transform
+             if( (runMode == bolt::amp::control::SerialCpu) )
+             {
+                std::transform( first, last, result, f );
+                return;
+             }
+             else if( (runMode == bolt::amp::control::MultiCoreCpu) )
+             {
+
+#if defined( ENABLE_TBB )
+
+                bolt::btbb::transform( first, last, result, f);
 #else
                 throw std::exception(  "The MultiCoreCpu version of transform is not enabled to be built." );
 #endif
@@ -482,7 +527,7 @@ namespace bolt
                                                  std::random_access_iterator_tag,
                                                  std::random_access_iterator_tag)
             {
-                transform_pick_iterator( ctl, first1, last1, first2, result, f  );
+                transform_pick_iterator( ctl, first1, last1, first2, result, f, std::iterator_traits< InputIterator1 >::iterator_category() );
             }
 
             template<typename InputIterator1, typename InputIterator2, typename OutputIterator, typename BinaryFunction>
@@ -520,7 +565,18 @@ namespace bolt
                                                        const UnaryFunction& f,
                                                        std::random_access_iterator_tag )
             {
-                transform_unary_pick_iterator( ctl, first1, last1, result, f  );
+                transform_unary_pick_iterator( ctl, first1, last1, result, f, std::iterator_traits< InputIterator >::iterator_category() );
+            }
+
+            template<typename InputIterator, typename OutputIterator, typename UnaryFunction>
+            void transform_unary_detect_random_access( bolt::amp::control& ctl,
+                                                       const InputIterator& first1,
+                                                       const InputIterator& last1,
+                                                       const OutputIterator& result,
+                                                       const UnaryFunction& f,
+                                                       bolt::amp::fancy_iterator_tag )
+            {
+                transform_unary_pick_iterator( ctl, first1, last1, result, f, std::iterator_traits< InputIterator >::iterator_category() );
             }
 
 
