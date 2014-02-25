@@ -806,7 +806,7 @@ TEST( Vector, wdSpecifyingSize )
     bolt::BCKND::device_vector<int> myIntDevVect;
     int myIntArray[10] = {2, 3, 5, 6, 76, 5, 8, -10, 30, 34};
 
-	for (size_t i = 0; i < mySize; ++i){
+    for (size_t i = 0; i < mySize; ++i){
         myIntDevVect.push_back(myIntArray[i]);
     }
 
@@ -896,19 +896,19 @@ TEST( Vector, Resize )
 
 TEST( Vector, ShrinkToFit)
 {
-	bolt::BCKND::device_vector< int > dV(100);
-	EXPECT_EQ(dV.size(),dV.capacity());
-	dV.reserve(200);
-	EXPECT_EQ(200,dV.capacity());
-	dV.shrink_to_fit();
-	EXPECT_EQ(dV.size(),dV.capacity());
+    bolt::BCKND::device_vector< int > dV(100);
+    EXPECT_EQ(dV.size(),dV.capacity());
+    dV.reserve(200);
+    EXPECT_EQ(200,dV.capacity());
+    dV.shrink_to_fit();
+    EXPECT_EQ(dV.size(),dV.capacity());
 #if 0
-	//Just like that.
-	for(int i=0; i<(2<<21);i+=(2<<3)){
-		dV.reserve(i);
-		dV.shrink_to_fit();
-		EXPECT_EQ(dV.size(),dV.capacity());
-	}
+    //Just like that.
+    for(int i=0; i<(2<<21);i+=(2<<3)){
+        dV.reserve(i);
+        dV.shrink_to_fit();
+        EXPECT_EQ(dV.size(),dV.capacity());
+    }
 
 #endif
 }
@@ -1185,7 +1185,7 @@ TEST( VectorIterator, BackFront )
 }
 int _tmain(int argc, _TCHAR* argv[])
 {
-	::testing::InitGoogleTest( &argc, &argv[ 0 ] );
+    ::testing::InitGoogleTest( &argc, &argv[ 0 ] );
     
     //  Register our minidump generating logic
     bolt::miniDumpSingleton::enableMiniDumps( );
