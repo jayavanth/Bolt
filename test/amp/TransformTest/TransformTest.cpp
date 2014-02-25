@@ -66,8 +66,9 @@ TEST( TransformUDD, UDDTestDeviceVector)
     etype elements[WAVEFRNT_SIZE];
     ptype permutation[WAVEFRNT_SIZE];
 
-    std::iota(elements, elements+WAVEFRNT_SIZE, 1000);
+    std::for_each( elements, elements+WAVEFRNT_SIZE, [](int &n) mutable { static int _i=1; n=_i++; } );
     std::fill(permutation, permutation+WAVEFRNT_SIZE, 0);
+
 
     bolt::amp::device_vector<int, concurrency::array_view> inputV2(elements, elements + WAVEFRNT_SIZE);
     bolt::amp::device_vector<int, concurrency::array_view> resultV2(permutation,permutation + WAVEFRNT_SIZE);
