@@ -204,7 +204,7 @@ typename std::enable_if< !(std::is_same< typename std::iterator_traits<typename 
  cmpArrays( const S& ref, const B& calc )
 {
     BOLT_TEST_RESET_FAILURES
-    for( size_t i = 0; i < ref.size( ); ++i )
+    for( int i = 0; i < int(ref.size( )); ++i )
     {
        
         //the two float values are almost equal 

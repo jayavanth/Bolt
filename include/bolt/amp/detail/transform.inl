@@ -64,14 +64,16 @@ namespace bolt
                 typedef std::iterator_traits< DVInputIterator2 >::value_type iType2;
                 typedef std::iterator_traits< DVOutputIterator >::value_type oType;
 
-                const unsigned int szElements =  static_cast< unsigned int >( std::distance( first1, last1 ) );
+                int szElements =  int( std::distance( first1, last1 ) );
 
 
-                auto inputV1 = first1.getContainer().getBuffer(first1);
-                auto inputV2 = first2.getContainer().getBuffer(first2);
-                auto resultV = result.getContainer().getBuffer(result);
+                //auto inputV1 = first1.getContainer().getBuffer(first1);
+                //auto inputV2 = first2.getContainer().getBuffer(first2);
+                //auto resultV = result.getContainer().getBuffer(result);
 
-
+                auto x = result.getContainer();
+                auto y = first1.getContainer();
+                auto z = first2.getContainer();
                 const unsigned int leng =  szElements + TRANSFORM_WAVEFRNT_SIZE - (szElements % TRANSFORM_WAVEFRNT_SIZE);
 
                 concurrency::extent< 1 > inputExtent(leng);
@@ -81,12 +83,14 @@ namespace bolt
 
                     concurrency::parallel_for_each(av,  inputExtent, [=](concurrency::index<1> idx) restrict(amp)
                     {
-                        unsigned int globalId = idx[ 0 ];
+                        int globalId = idx[ 0 ];
 
                         if( globalId >= szElements)
                         return;
 
-                        resultV[globalId] = f(inputV1[globalId],inputV2[globalId]);
+                        result[globalId] = f(first1[globalId],first2[globalId]);
+                        //x[globalId] = f(y[globalId],z[globalId]);
+                        //x[globalId] = y[globalId];
                     });
                 }
 
@@ -416,7 +420,7 @@ namespace bolt
                typedef std::iterator_traits< DVInputIterator2 >::value_type iType2;
                typedef std::iterator_traits< DVOutputIterator >::value_type oType;
 
-               size_t sz = std::distance( first1, last1 );
+               int sz = int(std::distance( first1, last1 ));
                if( sz == 0 )
                     return;
 
